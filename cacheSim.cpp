@@ -108,7 +108,6 @@ int main(int argc, char **argv) {
 			L2_cache[i].ways[j].valid = 0;
 	}
 
-	
 	int L1AccCnt = 0;
 	int L2AccCnt = 0;
 	int L1MissCnt = 0;
@@ -163,18 +162,88 @@ int main(int argc, char **argv) {
 			//search for tag in L2
 			if (IsInCache(num, Bsize, L2NumSets, L2Assoc, L2_cache))
 			{
+				//need to put in L1 also
+				//if L1 have no space, take someone out
+					// if it dirty update L2 dirty, (and update L2 lru??)
 				updateLRU(num, Bsize, L2NumSets, L2Assoc, L2_cache)
-					continue;
+				continue;
 			}
-
+			
+			// tag in mem (not in L1, not in L2)
+			L2MissCnt++;
+			TotalTime += MemCyc;
+			//add address to L2
+				//if L2 have no space, take someone out
+			
+			//add address to L1
+			//if L1 have no space, take someone out
+				// if it dirty update L2 dirty, (and update L2 lru??)
 		}
+		else if (operation == 'w')
+		{
+			//update L1 access counter and time
+			L1AccCnt++;
+			TotalTime += L1Cyc;
 
+			//search for tag in L1
+			if (IsInCache(num, Bsize, L1NumSets, L1Assoc, L1_cache))
+			{
+				//update dirty L1
+				updateLRU(num, Bsize, L1NumSets, L1Assoc, L1_cache)
+				continue;
+			}
+			//tag not in L1,need to check in L2
+			//update L1 miss cnt, L2 acc counter and add L2 acc time to total time
+			L1MissCnt++;
+			L2AccCnt++;
+			TotalTime += L2Cyc;
 
+			//search for tag in L2
+			if (IsInCache(num, Bsize, L2NumSets, L2Assoc, L2_cache))
+			{
+				if (WrAlloc) //if WrAlloc==true need to write in L1
+				{
+					//add address to L1
+						//if L1 have no space, take someone out
+							// if it dirty update L2 dirty, (and update L2 lru??)
+					//mark data in L1 as dirty
+					//update lru in L1
+					continue;
+				}
+				//update dirty to L2, no need to write to L1 because no allocate
+				updateLRU(num, Bsize, L2NumSets, L2Assoc, L2_cache)
+				continue;
+			}
+			
+			// tag in mem (not in L1, not in L2)
+			TotalTime += MemCyc;
+			L2MissCnt++;
+			if (WrAlloc) //if WrAlloc==true need to write in L1 and L2
+			{
+				//add address to L1
+					//if L1 have no space, take someone out
+						// if it dirty update L2 dirty, (and update L2 lru??)
+				//mark data in L1 as dirty
+
+				//add address to L2
+					//if L2 have no space, take someone out
+			}
+			//write to mem,  no need to write to L1 and L2 because no allocate
+		}
 	}
-
-	double L1MissRate;
-	double L2MissRate;
-	double avgAccTime;
+	
+	double L1MissRate = 0;
+	double L2MissRate = 0;
+	double avgAccTime = 0;
+	if (L1AccCnt != 0)
+	{
+		double L1MissRate = L1MissCnt / L1AccCnt;
+		double avgAccTime = TotalTime / L1AccCnt;
+	}
+	if (L2AccCnt != 0)
+	{
+		double L2MissRate = L2MissCnt / L2AccCnt;
+	}
 
 	printf("L1miss=%.03f ", L1MissRate);
 	printf("L2miss=%.03f ", L2MissRate);
@@ -221,5 +290,4 @@ void updateLRU(unsigned long int num, unsigned Bsize, int SetNum, unsigned cache
 			cache[set].LRU[j]--;
 		}
 	}
-		
 }
