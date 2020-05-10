@@ -26,12 +26,16 @@ typedef struct way_t {
 	int tag;
 	bool valid;
 	bool dirty;
+	unsigned long int address;
 };
 
 std::vector<cache_entry_t> L1_cache;
 std::vector<cache_entry_t> L2_cache;
 
 bool IsInCache(unsigned long int num, unsigned Bsize, int SetNum, unsigned cacheAss, std::vector<cache_entry_t> cache);
+unsigned long int writeToCache(unsigned long int num, unsigned Bsize, int SetNum, unsigned cacheAssoc, std::vector<cache_entry_t> cache);
+void UpdateDirty(unsigned long int num, unsigned Bsize, int SetNum, unsigned cacheAssoc, std::vector<cache_entry_t> cache, bool dirty);
+void removeBlockFromCache(unsigned long int num, unsigned Bsize, int SetNum, unsigned cacheAssoc, std::vector<cache_entry_t> cache);
 
 int main(int argc, char **argv) {
 
@@ -94,6 +98,8 @@ int main(int argc, char **argv) {
 		for (int j = 0; j < (pow(2, L1Assoc)); j++)
 			L1_cache[i].LRU[j] = j;
 			L1_cache[i].ways[j].valid = 0;
+			L1_cache[i].ways[j].dirty = 0;
+			L1_cache[i].ways[j].address = 0;
 			
 	}
 
@@ -106,6 +112,8 @@ int main(int argc, char **argv) {
 		for (int j = 0; j < (pow(2, L2Assoc)); j++)
 			L2_cache[i].LRU[j] = j;
 			L2_cache[i].ways[j].valid = 0;
+			L2_cache[i].ways[j].dirty = 0;
+			L2_cache[i].ways[j].address = 0;
 	}
 
 	int L1AccCnt = 0;
@@ -162,10 +170,16 @@ int main(int argc, char **argv) {
 			//search for tag in L2
 			if (IsInCache(num, Bsize, L2NumSets, L2Assoc, L2_cache))
 			{
-				//need to put in L1 also
-				//if L1 have no space, take someone out
-					// if it dirty update L2 dirty, (and update L2 lru??)
-				updateLRU(num, Bsize, L2NumSets, L2Assoc, L2_cache)
+				//tag in L2, write it to L1
+				unsigned long int removedAddress = writeToCache(num, Bsize, L1NumSets, L1Assoc, L1_cache);
+				// if removed block from L1 and it is dirty: update L2 block as dirty
+				if (removedAddress != 1)
+				{
+					UpdateDirty(removedAddress, Bsize, L2NumSets, L2Assoc, L2_cache, true);
+				}
+					
+				//update L2 LRU because we read from block of address "num"
+				updateLRU(num, Bsize, L2NumSets, L2Assoc, L2_cache);
 				continue;
 			}
 			
@@ -173,11 +187,31 @@ int main(int argc, char **argv) {
 			L2MissCnt++;
 			TotalTime += MemCyc;
 			//add address to L2
+			unsigned long int removedAddress = writeToCache(num, Bsize, L2NumSets, L2Assoc, L2_cache);
 				//if L2 have no space, take someone out
-			
+			//check if removed block form L2 is in L1
+			if (IsInCache(removedAddress, Bsize, L1NumSets, L1Assoc, L1_cache))
+			{
+				//removed block from L2 is in L1, due to inclussivness,need to remove it
+				removeBlockFromCache(num, Bsize, L1NumSets, L1Assoc, L1_cache);
+
+			}
+
+			//tag in L2, write it to L1
 			//add address to L1
 			//if L1 have no space, take someone out
-				// if it dirty update L2 dirty, (and update L2 lru??)
+			removedAddress = writeToCache(num, Bsize, L1NumSets, L1Assoc, L1_cache);
+			// if removed block from L1 and it is dirty: update L2 block as dirty
+			if (removedAddress != 1)
+			{
+				// if it dirty update L2 dirty
+				UpdateDirty(removedAddress, Bsize, L2NumSets, L2Assoc, L2_cache, true);
+			}
+			continue;
+
+			
+			
+				
 		}
 		else if (operation == 'w')
 		{
@@ -203,7 +237,7 @@ int main(int argc, char **argv) {
 			{
 				if (WrAlloc) //if WrAlloc==true need to write in L1
 				{
-					//add address to L1
+					
 						//if L1 have no space, take someone out
 							// if it dirty update L2 dirty, (and update L2 lru??)
 					//mark data in L1 as dirty
@@ -277,7 +311,7 @@ void updateLRU(unsigned long int num, unsigned Bsize, int SetNum, unsigned cache
 	{
 		if ((cache[set].ways[i].valid == 1) && (cache[set].ways[i].tag == tag))
 		{
-			break;;
+			break;
 		}
 	}
 	//update LRU counters
@@ -290,4 +324,89 @@ void updateLRU(unsigned long int num, unsigned Bsize, int SetNum, unsigned cache
 			cache[set].LRU[j]--;
 		}
 	}
+}
+
+
+//write to cache and return the tag of removed block case a block got removed duo to write opration
+unsigned long int writeToCache(unsigned long int num,unsigned Bsize, int SetNum, unsigned cacheAssoc, std::vector<cache_entry_t> cache)
+{
+	int set = (num / Bsize) % (log2((double)SetNum));
+	int tag = num / (Bsize + log2((double)SetNum));
+
+	//first check for empty ways
+	for (int i = 0; i < pow(2, cacheAssoc); i++)
+	{
+		if (cache[set].ways[i].valid == 0)
+		{
+			//case there is an empty way, write the tag to it
+			cache[set].ways[i].valid = 1;
+			cache[set].ways[i].dirty = 0;
+			cache[set].ways[i].tag = tag;
+			cache[set].ways[i].address = num;
+			updateLRU(num, Bsize, SetNum, cacheAssoc, cache);
+			//case not dirty, no need to update so send false addres(because it is not aligned to 4 )
+			return 1;
+
+		}
+	}
+
+	//search LRU way
+	int idx = 0;
+	for (int i = 0; i < pow(2, cacheAssoc); i++)
+	{
+		if (cache[set].LRU[i] == 0)
+		{
+			idx = i;
+		}
+	}
+	//save removed address
+	
+	
+	unsigned long int removedAddress = 1; //case not dirty, no need to update so send false addres(because it is not aligned to 4 )
+	
+	if (cache[set].ways[idx].dirty)
+	{
+		removedAddress = cache[set].ways[idx].address;
+	}
+	
+			
+	//update way
+	cache[set].ways[idx].valid = 1;
+	cache[set].ways[idx].dirty = 0;
+	cache[set].ways[idx].tag = tag;
+	cache[set].ways[idx].address = num;
+	updateLRU(num, Bsize, SetNum, cacheAssoc, cache);
+	
+	return removedAddress;
+}
+
+void UpdateDirty(unsigned long int num, unsigned Bsize, int SetNum, unsigned cacheAssoc, std::vector<cache_entry_t> cache,bool dirty)
+{
+	int set = (num / Bsize) % (log2((double)SetNum));
+	int tag = num / (Bsize + log2((double)SetNum));
+
+	for (int i = 0; i < pow(2, cacheAssoc); i++)
+	{
+		if (cache[set].ways[i].tag == tag)
+		{
+			cache[set].ways[i].dirty = dirty;
+			return;
+		}
+	}
+}
+
+void removeBlockFromCache(unsigned long int num, unsigned Bsize, int SetNum, unsigned cacheAssoc, std::vector<cache_entry_t> cache)
+{
+	int set = (num / Bsize) % (log2((double)SetNum));
+	int tag = num / (Bsize + log2((double)SetNum));
+
+	for (int i = 0; i < pow(2, cacheAssoc); i++)
+	{
+		if (cache[set].ways[i].tag == tag)
+		{
+			cache[set].ways[i].valid= false;
+			return;
+		}
+	}
+}
 }
