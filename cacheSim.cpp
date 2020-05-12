@@ -33,7 +33,7 @@ std::vector<cache_entry_t> L1_cache;
 std::vector<cache_entry_t> L2_cache;
 
 bool IsInCache(unsigned long int num, unsigned Bsize, int SetNum, unsigned cacheAss, std::vector<cache_entry_t> cache);
-unsigned long int writeToCache(unsigned long int num, unsigned Bsize, int SetNum, unsigned cacheAssoc, std::vector<cache_entry_t> cache);
+unsigned long int writeBlockToCache(unsigned long int num, unsigned Bsize, int SetNum, unsigned cacheAssoc, std::vector<cache_entry_t> cache);
 void UpdateDirty(unsigned long int num, unsigned Bsize, int SetNum, unsigned cacheAssoc, std::vector<cache_entry_t> cache, bool dirty);
 void removeBlockFromCache(unsigned long int num, unsigned Bsize, int SetNum, unsigned cacheAssoc, std::vector<cache_entry_t> cache);
 
@@ -171,7 +171,7 @@ int main(int argc, char **argv) {
 			if (IsInCache(num, Bsize, L2NumSets, L2Assoc, L2_cache))
 			{
 				//tag in L2, write it to L1
-				unsigned long int removedAddress = writeToCache(num, Bsize, L1NumSets, L1Assoc, L1_cache);
+				unsigned long int removedAddress = writeBlockToCache(num, Bsize, L1NumSets, L1Assoc, L1_cache);
 				// if removed block from L1 and it is dirty: update L2 block as dirty
 				if (removedAddress != 1)
 				{
@@ -187,7 +187,7 @@ int main(int argc, char **argv) {
 			L2MissCnt++;
 			TotalTime += MemCyc;
 			//add address to L2
-			unsigned long int removedAddress = writeToCache(num, Bsize, L2NumSets, L2Assoc, L2_cache);
+			unsigned long int removedAddress = writeBlockToCache(num, Bsize, L2NumSets, L2Assoc, L2_cache);
 				//if L2 have no space, take someone out
 			//check if removed block form L2 is in L1
 			if (IsInCache(removedAddress, Bsize, L1NumSets, L1Assoc, L1_cache))
@@ -200,7 +200,7 @@ int main(int argc, char **argv) {
 			//tag in L2, write it to L1
 			//add address to L1
 			//if L1 have no space, take someone out
-			removedAddress = writeToCache(num, Bsize, L1NumSets, L1Assoc, L1_cache);
+			removedAddress = writeBlockToCache(num, Bsize, L1NumSets, L1Assoc, L1_cache);
 			// if removed block from L1 and it is dirty: update L2 block as dirty
 			if (removedAddress != 1)
 			{
@@ -223,7 +223,8 @@ int main(int argc, char **argv) {
 			if (IsInCache(num, Bsize, L1NumSets, L1Assoc, L1_cache))
 			{
 				//update dirty L1
-				updateLRU(num, Bsize, L1NumSets, L1Assoc, L1_cache)
+				UpdateDirty(num, Bsize, L1NumSets, L1Assoc, L1_cache, true);
+				updateLRU(num, Bsize, L1NumSets, L1Assoc, L1_cache);
 				continue;
 			}
 			//tag not in L1,need to check in L2
@@ -238,14 +239,25 @@ int main(int argc, char **argv) {
 				if (WrAlloc) //if WrAlloc==true need to write in L1
 				{
 					
-						//if L1 have no space, take someone out
-							// if it dirty update L2 dirty, (and update L2 lru??)
-					//mark data in L1 as dirty
-					//update lru in L1
+					//if L1 have no space, take someone out
+					unsigned long int removedAddress = writeBlockToCache(num, Bsize, L1NumSets, L1Assoc, L1_cache);
+					UpdateDirty(num, Bsize, L1NumSets, L1Assoc, L1_cache, true);//mark data in L1 as dirty
+					
+					// if removed block from L1 and it is dirty: update L2 block as dirty
+					if (removedAddress != 1)
+					{
+						UpdateDirty(removedAddress, Bsize, L2NumSets, L2Assoc, L2_cache, true);// if it dirty update L2 dirty
+					}
+
+					//update L2 LRU because we read from block of address "num"
+					updateLRU(num, Bsize, L2NumSets, L2Assoc, L2_cache);
 					continue;
+					
 				}
 				//update dirty to L2, no need to write to L1 because no allocate
-				updateLRU(num, Bsize, L2NumSets, L2Assoc, L2_cache)
+				updateLRU(num, Bsize, L2NumSets, L2Assoc, L2_cache);
+				//update blokc in L2 as dirty
+				UpdateDirty(num, Bsize, L2NumSets, L2Assoc, L2_cache, true);
 				continue;
 			}
 			
@@ -259,8 +271,29 @@ int main(int argc, char **argv) {
 						// if it dirty update L2 dirty, (and update L2 lru??)
 				//mark data in L1 as dirty
 
+				
 				//add address to L2
-					//if L2 have no space, take someone out
+				unsigned long int removedAddress = writeBlockToCache(num, Bsize, L2NumSets, L2Assoc, L2_cache);
+				//if L2 have no space, take someone out
+				//check if removed block form L2 is in L1
+				if (IsInCache(removedAddress, Bsize, L1NumSets, L1Assoc, L1_cache))
+				{
+					//removed block from L2 is in L1, due to inclussivness,need to remove it
+					removeBlockFromCache(num, Bsize, L1NumSets, L1Assoc, L1_cache);
+
+				}
+
+				//tag in L2, write it to L1
+				//add address to L1
+				//if L1 have no space, take someone out
+				removedAddress = writeBlockToCache(num, Bsize, L1NumSets, L1Assoc, L1_cache);
+				// if removed block from L1 and it is dirty: update L2 block as dirty
+				if (removedAddress != 1)
+				{
+					// if it dirty update L2 dirty
+					UpdateDirty(removedAddress, Bsize, L2NumSets, L2Assoc, L2_cache, true);
+				}
+				UpdateDirty(num, Bsize, L1NumSets, L1Assoc, L1_cache, true);
 			}
 			//write to mem,  no need to write to L1 and L2 because no allocate
 		}
@@ -328,7 +361,7 @@ void updateLRU(unsigned long int num, unsigned Bsize, int SetNum, unsigned cache
 
 
 //write to cache and return the tag of removed block case a block got removed duo to write opration
-unsigned long int writeToCache(unsigned long int num,unsigned Bsize, int SetNum, unsigned cacheAssoc, std::vector<cache_entry_t> cache)
+unsigned long int writeBlockToCache(unsigned long int num,unsigned Bsize, int SetNum, unsigned cacheAssoc, std::vector<cache_entry_t> cache)
 {
 	int set = (num / Bsize) % (log2((double)SetNum));
 	int tag = num / (Bsize + log2((double)SetNum));
