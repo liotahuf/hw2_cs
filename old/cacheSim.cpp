@@ -15,14 +15,6 @@ using std::cerr;
 using std::ifstream;
 using std::stringstream;
 
-typedef struct way_t {
-	int tag;
-	bool valid;
-	bool dirty;
-	unsigned long int address;
-};
-
-
 typedef struct cache_entry_t {
 
 	std::vector<int> LRU;
@@ -30,15 +22,20 @@ typedef struct cache_entry_t {
 	
 } cache_entry;
 
+typedef struct way_t {
+	int tag;
+	bool valid;
+	bool dirty;
+	unsigned long int address;
+};
 
 std::vector<cache_entry_t> L1_cache;
 std::vector<cache_entry_t> L2_cache;
 
-bool IsInCache(unsigned long int num,unsigned BSize,int SetNum ,unsigned cacheAssoc ,std::vector<cache_entry_t>& cache);
-void updateLRU(unsigned long int num, unsigned BSize, int SetNum, unsigned cacheAssoc, std::vector<cache_entry_t>& cache);
-unsigned long int writeBlockToCache(unsigned long int num, unsigned BSize, int SetNum, unsigned cacheAssoc, std::vector<cache_entry_t>& cache);
-void UpdateDirty(unsigned long int num, unsigned BSize, int SetNum, unsigned cacheAssoc, std::vector<cache_entry_t>& cache, bool dirty);
-void removeBlockFromCache(unsigned long int num, unsigned BSize, int SetNum, unsigned cacheAssoc, std::vector<cache_entry_t>& cache);
+bool IsInCache(unsigned long int num, unsigned Bsize, int SetNum, unsigned cacheAss, std::vector<cache_entry_t> cache);
+unsigned long int writeBlockToCache(unsigned long int num, unsigned Bsize, int SetNum, unsigned cacheAssoc, std::vector<cache_entry_t> cache);
+void UpdateDirty(unsigned long int num, unsigned Bsize, int SetNum, unsigned cacheAssoc, std::vector<cache_entry_t> cache, bool dirty);
+void removeBlockFromCache(unsigned long int num, unsigned Bsize, int SetNum, unsigned cacheAssoc, std::vector<cache_entry_t> cache);
 
 int main(int argc, char **argv) {
 
@@ -94,28 +91,15 @@ int main(int argc, char **argv) {
 	//initiate L1
 	int L1NumLines = pow(2,L1Size)/(pow(2,BSize)) ;
 	int L1NumSets = L1NumLines / (pow(2, L1Assoc));
-//	way_t tmpWay;
-/*	cache_entry_t tmpEntry;
-	tmpWay.address =1;
-	tmpWay.valid=false;
-	tmpWay.dirty =false;
-	tmpWay.tag =-1;*/
-
-
+	
 
 	for (int i = 0; i < L1NumSets; i++)
 	{
-		L1_cache.push_back({});
 		for (int j = 0; j < (pow(2, L1Assoc)); j++)
-		{
-			L1_cache[i].LRU.push_back({});
-			L1_cache[i].ways.push_back({});
 			L1_cache[i].LRU[j] = j;
 			L1_cache[i].ways[j].valid = 0;
-			L1_cache[i].ways[j].address = 1;
 			L1_cache[i].ways[j].dirty = 0;
-
-		}
+			L1_cache[i].ways[j].address = 0;
 			
 	}
 
@@ -125,18 +109,11 @@ int main(int argc, char **argv) {
 
 	for (int i = 0; i < L2NumSets; i++)
 	{
-		L2_cache.push_back({});
 		for (int j = 0; j < (pow(2, L2Assoc)); j++)
-
-		{
-			L2_cache[i].LRU.push_back({});
-			L2_cache[i].ways.push_back({});
 			L2_cache[i].LRU[j] = j;
 			L2_cache[i].ways[j].valid = 0;
 			L2_cache[i].ways[j].dirty = 0;
-			L2_cache[i].ways[j].address = 1;
-		}
-
+			L2_cache[i].ways[j].address = 0;
 	}
 
 	int L1AccCnt = 0;
@@ -179,9 +156,9 @@ int main(int argc, char **argv) {
 			TotalTime += L1Cyc;
 
 			//search for tag in L1
-			if (IsInCache(num, BSize, L1NumSets, L1Assoc, L1_cache))
+			if (IsInCache(num, Bsize, L1NumSets, L1Assoc, L1_cache))
 			{
-				updateLRU(num, BSize, L1NumSets, L1Assoc, L1_cache);
+				updateLRU(num, Bsize, L1NumSets, L1Assoc, L1_cache)
 				continue;
 			}
 			//tag not in L1,need to check in L2
@@ -191,18 +168,18 @@ int main(int argc, char **argv) {
 			TotalTime += L2Cyc;
 
 			//search for tag in L2
-			if (IsInCache(num, BSize, L2NumSets, L2Assoc, L2_cache))
+			if (IsInCache(num, Bsize, L2NumSets, L2Assoc, L2_cache))
 			{
 				//tag in L2, write it to L1
-				unsigned long int removedAddress = writeBlockToCache(num, BSize, L1NumSets, L1Assoc, L1_cache);
+				unsigned long int removedAddress = writeBlockToCache(num, Bsize, L1NumSets, L1Assoc, L1_cache);
 				// if removed block from L1 and it is dirty: update L2 block as dirty
 				if (removedAddress != 1)
 				{
-					UpdateDirty(removedAddress, BSize, L2NumSets, L2Assoc, L2_cache, true);
+					UpdateDirty(removedAddress, Bsize, L2NumSets, L2Assoc, L2_cache, true);
 				}
 					
 				//update L2 LRU because we read from block of address "num"
-				updateLRU(num, BSize, L2NumSets, L2Assoc, L2_cache);
+				updateLRU(num, Bsize, L2NumSets, L2Assoc, L2_cache);
 				continue;
 			}
 			
@@ -210,25 +187,25 @@ int main(int argc, char **argv) {
 			L2MissCnt++;
 			TotalTime += MemCyc;
 			//add address to L2
-			unsigned long int removedAddress = writeBlockToCache(num, BSize, L2NumSets, L2Assoc, L2_cache);
+			unsigned long int removedAddress = writeBlockToCache(num, Bsize, L2NumSets, L2Assoc, L2_cache);
 				//if L2 have no space, take someone out
 			//check if removed block form L2 is in L1
-			if (IsInCache(removedAddress, BSize, L1NumSets, L1Assoc, L1_cache))
+			if (IsInCache(removedAddress, Bsize, L1NumSets, L1Assoc, L1_cache))
 			{
 				//removed block from L2 is in L1, due to inclussivness,need to remove it
-				removeBlockFromCache(num, BSize, L1NumSets, L1Assoc, L1_cache);
+				removeBlockFromCache(num, Bsize, L1NumSets, L1Assoc, L1_cache);
 
 			}
 
 			//tag in L2, write it to L1
 			//add address to L1
 			//if L1 have no space, take someone out
-			removedAddress = writeBlockToCache(num, BSize, L1NumSets, L1Assoc, L1_cache);
+			removedAddress = writeBlockToCache(num, Bsize, L1NumSets, L1Assoc, L1_cache);
 			// if removed block from L1 and it is dirty: update L2 block as dirty
 			if (removedAddress != 1)
 			{
 				// if it dirty update L2 dirty
-				UpdateDirty(removedAddress, BSize, L2NumSets, L2Assoc, L2_cache, true);
+				UpdateDirty(removedAddress, Bsize, L2NumSets, L2Assoc, L2_cache, true);
 			}
 			continue;
 
@@ -243,11 +220,11 @@ int main(int argc, char **argv) {
 			TotalTime += L1Cyc;
 
 			//search for tag in L1
-			if (IsInCache(num, BSize, L1NumSets, L1Assoc, L1_cache))
+			if (IsInCache(num, Bsize, L1NumSets, L1Assoc, L1_cache))
 			{
 				//update dirty L1
-				UpdateDirty(num, BSize, L1NumSets, L1Assoc, L1_cache, true);
-				updateLRU(num, BSize, L1NumSets, L1Assoc, L1_cache);
+				UpdateDirty(num, Bsize, L1NumSets, L1Assoc, L1_cache, true);
+				updateLRU(num, Bsize, L1NumSets, L1Assoc, L1_cache);
 				continue;
 			}
 			//tag not in L1,need to check in L2
@@ -257,30 +234,30 @@ int main(int argc, char **argv) {
 			TotalTime += L2Cyc;
 
 			//search for tag in L2
-			if (IsInCache(num, BSize, L2NumSets, L2Assoc, L2_cache))
+			if (IsInCache(num, Bsize, L2NumSets, L2Assoc, L2_cache))
 			{
 				if (WrAlloc) //if WrAlloc==true need to write in L1
 				{
 					
 					//if L1 have no space, take someone out
-					unsigned long int removedAddress = writeBlockToCache(num, BSize, L1NumSets, L1Assoc, L1_cache);
-					UpdateDirty(num, BSize, L1NumSets, L1Assoc, L1_cache, true);//mark data in L1 as dirty
+					unsigned long int removedAddress = writeBlockToCache(num, Bsize, L1NumSets, L1Assoc, L1_cache);
+					UpdateDirty(num, Bsize, L1NumSets, L1Assoc, L1_cache, true);//mark data in L1 as dirty
 					
 					// if removed block from L1 and it is dirty: update L2 block as dirty
 					if (removedAddress != 1)
 					{
-						UpdateDirty(removedAddress, BSize, L2NumSets, L2Assoc, L2_cache, true);// if it dirty update L2 dirty
+						UpdateDirty(removedAddress, Bsize, L2NumSets, L2Assoc, L2_cache, true);// if it dirty update L2 dirty
 					}
 
 					//update L2 LRU because we read from block of address "num"
-					updateLRU(num, BSize, L2NumSets, L2Assoc, L2_cache);
+					updateLRU(num, Bsize, L2NumSets, L2Assoc, L2_cache);
 					continue;
 					
 				}
 				//update dirty to L2, no need to write to L1 because no allocate
-				updateLRU(num, BSize, L2NumSets, L2Assoc, L2_cache);
+				updateLRU(num, Bsize, L2NumSets, L2Assoc, L2_cache);
 				//update blokc in L2 as dirty
-				UpdateDirty(num, BSize, L2NumSets, L2Assoc, L2_cache, true);
+				UpdateDirty(num, Bsize, L2NumSets, L2Assoc, L2_cache, true);
 				continue;
 			}
 			
@@ -296,27 +273,27 @@ int main(int argc, char **argv) {
 
 				
 				//add address to L2
-				unsigned long int removedAddress = writeBlockToCache(num, BSize, L2NumSets, L2Assoc, L2_cache);
+				unsigned long int removedAddress = writeBlockToCache(num, Bsize, L2NumSets, L2Assoc, L2_cache);
 				//if L2 have no space, take someone out
 				//check if removed block form L2 is in L1
-				if (IsInCache(removedAddress, BSize, L1NumSets, L1Assoc, L1_cache))
+				if (IsInCache(removedAddress, Bsize, L1NumSets, L1Assoc, L1_cache))
 				{
 					//removed block from L2 is in L1, due to inclussivness,need to remove it
-					removeBlockFromCache(num, BSize, L1NumSets, L1Assoc, L1_cache);
+					removeBlockFromCache(num, Bsize, L1NumSets, L1Assoc, L1_cache);
 
 				}
 
 				//tag in L2, write it to L1
 				//add address to L1
 				//if L1 have no space, take someone out
-				removedAddress = writeBlockToCache(num, BSize, L1NumSets, L1Assoc, L1_cache);
+				removedAddress = writeBlockToCache(num, Bsize, L1NumSets, L1Assoc, L1_cache);
 				// if removed block from L1 and it is dirty: update L2 block as dirty
 				if (removedAddress != 1)
 				{
 					// if it dirty update L2 dirty
-					UpdateDirty(removedAddress, BSize, L2NumSets, L2Assoc, L2_cache, true);
+					UpdateDirty(removedAddress, Bsize, L2NumSets, L2Assoc, L2_cache, true);
 				}
-				UpdateDirty(num, BSize, L1NumSets, L1Assoc, L1_cache, true);
+				UpdateDirty(num, Bsize, L1NumSets, L1Assoc, L1_cache, true);
 			}
 			//write to mem,  no need to write to L1 and L2 because no allocate
 		}
@@ -327,12 +304,12 @@ int main(int argc, char **argv) {
 	double avgAccTime = 0;
 	if (L1AccCnt != 0)
 	{
-		L1MissRate = ((double)L1MissCnt )/ L1AccCnt;
-		avgAccTime = ((double)TotalTime) / L1AccCnt;
+		double L1MissRate = L1MissCnt / L1AccCnt;
+		double avgAccTime = TotalTime / L1AccCnt;
 	}
 	if (L2AccCnt != 0)
 	{
-		L2MissRate = ((double)L2MissCnt) / L2AccCnt;
+		double L2MissRate = L2MissCnt / L2AccCnt;
 	}
 
 	printf("L1miss=%.03f ", L1MissRate);
@@ -342,16 +319,10 @@ int main(int argc, char **argv) {
 	return 0;
 }
 
-bool IsInCache(unsigned long int num,unsigned BSize,int SetNum ,unsigned cacheAssoc ,std::vector<cache_entry_t>& cache)
+bool IsInCache(unsigned long int num,unsigned Bsize,int SetNum ,unsigned cacheAssoc ,std::vector<cache_entry_t> cache)
 {
-	int set =0;
-	int tag = num / ((pow(2,BSize) *pow(2,SetNum-1)));
-	if(SetNum!=1)
-	{
-		set = (int)(num/BSize)%((int)log2((double) SetNum));
-
-	}
-
+	int set = (num/Bsize)%(log2((double) SetNum));
+	int tag =num/(Bsize + log2((double)SetNum)) ;
 	for (int i = 0; i < pow(2, cacheAssoc); i++)
 	{
 		if ((cache[set].ways[i].valid == 1) && (cache[set].ways[i].tag == tag))
@@ -362,15 +333,11 @@ bool IsInCache(unsigned long int num,unsigned BSize,int SetNum ,unsigned cacheAs
 	return false;
 }
 
-void updateLRU(unsigned long int num, unsigned BSize, int SetNum, unsigned cacheAssoc, std::vector<cache_entry_t>& cache)
+void updateLRU(unsigned long int num, unsigned Bsize, int SetNum, unsigned cacheAssoc, std::vector<cache_entry_t> cache)
 {
-	int set =0;
-	int tag = num / ((pow(2,BSize) *pow(2,SetNum-1)));
-	if(SetNum!=1)
-	{
-		set = (int)(num/BSize)%((int)log2((double) SetNum));
-
-	}
+	int set = (num / Bsize) % (log2((double)SetNum));
+	int tag = num / (Bsize + log2((double)SetNum));
+	
 	//find LRU idx of accessd way
 	int i;
 	for (i = 0; i < pow(2, cacheAssoc); i++)
@@ -394,15 +361,10 @@ void updateLRU(unsigned long int num, unsigned BSize, int SetNum, unsigned cache
 
 
 //write to cache and return the tag of removed block case a block got removed duo to write opration
-unsigned long int writeBlockToCache(unsigned long int num,unsigned BSize, int SetNum, unsigned cacheAssoc, std::vector<cache_entry_t>& cache)
+unsigned long int writeBlockToCache(unsigned long int num,unsigned Bsize, int SetNum, unsigned cacheAssoc, std::vector<cache_entry_t> cache)
 {
-	int set =0;
-	int tag = num / ((pow(2,BSize) *pow(2,SetNum-1)));
-	if(SetNum!=1)
-	{
-		set = (int)(num/BSize)%((int)log2((double) SetNum));
-
-	}
+	int set = (num / Bsize) % (log2((double)SetNum));
+	int tag = num / (Bsize + log2((double)SetNum));
 
 	//first check for empty ways
 	for (int i = 0; i < pow(2, cacheAssoc); i++)
@@ -414,7 +376,7 @@ unsigned long int writeBlockToCache(unsigned long int num,unsigned BSize, int Se
 			cache[set].ways[i].dirty = 0;
 			cache[set].ways[i].tag = tag;
 			cache[set].ways[i].address = num;
-			updateLRU(num, BSize, SetNum, cacheAssoc, cache);
+			updateLRU(num, Bsize, SetNum, cacheAssoc, cache);
 			//case not dirty, no need to update so send false addres(because it is not aligned to 4 )
 			return 1;
 
@@ -446,21 +408,15 @@ unsigned long int writeBlockToCache(unsigned long int num,unsigned BSize, int Se
 	cache[set].ways[idx].dirty = 0;
 	cache[set].ways[idx].tag = tag;
 	cache[set].ways[idx].address = num;
-	updateLRU(num, BSize, SetNum, cacheAssoc, cache);
+	updateLRU(num, Bsize, SetNum, cacheAssoc, cache);
 	
 	return removedAddress;
 }
 
-void UpdateDirty(unsigned long int num, unsigned BSize, int SetNum, unsigned cacheAssoc, std::vector<cache_entry_t>& cache,bool dirty)
+void UpdateDirty(unsigned long int num, unsigned Bsize, int SetNum, unsigned cacheAssoc, std::vector<cache_entry_t> cache,bool dirty)
 {
-	int set =0;
-	int tag = num / ((pow(2,BSize) *pow(2,SetNum-1)));
-	if(SetNum!=1)
-	{
-		set = (int)(num/BSize)%((int)log2((double) SetNum));
-
-	}
-
+	int set = (num / Bsize) % (log2((double)SetNum));
+	int tag = num / (Bsize + log2((double)SetNum));
 
 	for (int i = 0; i < pow(2, cacheAssoc); i++)
 	{
@@ -472,15 +428,10 @@ void UpdateDirty(unsigned long int num, unsigned BSize, int SetNum, unsigned cac
 	}
 }
 
-void removeBlockFromCache(unsigned long int num, unsigned BSize, int SetNum, unsigned cacheAssoc, std::vector<cache_entry_t>& cache)
+void removeBlockFromCache(unsigned long int num, unsigned Bsize, int SetNum, unsigned cacheAssoc, std::vector<cache_entry_t> cache)
 {
-	int set =0;
-	int tag = num / ((pow(2,BSize) *pow(2,SetNum-1)));
-	if(SetNum!=1)
-	{
-		set = (int)(num/BSize)%((int)log2((double) SetNum));
-
-	}
+	int set = (num / Bsize) % (log2((double)SetNum));
+	int tag = num / (Bsize + log2((double)SetNum));
 
 	for (int i = 0; i < pow(2, cacheAssoc); i++)
 	{
@@ -491,4 +442,4 @@ void removeBlockFromCache(unsigned long int num, unsigned BSize, int SetNum, uns
 		}
 	}
 }
-
+}
