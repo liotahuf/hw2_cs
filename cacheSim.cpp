@@ -159,18 +159,18 @@ int main(int argc, char **argv) {
 		}
 
 		// DEBUG - remove this line
-		cout << "operation: " << operation;
+		//cout << "operation: " << operation;
 
 		string cutAddress = address.substr(2); // Removing the "0x" part of the address
 
 		// DEBUG - remove this line
-		cout << ", address (hex)" << cutAddress;
+		//cout << ", address (hex)" << cutAddress;
 
 		unsigned long int num = 0;
 		num = strtoul(cutAddress.c_str(), NULL, 16);
 
 		// DEBUG - remove this line
-		cout << " (dec) " << num << endl;
+		//cout << " (dec) " << num << endl;
 
 		//if read access
 		if (operation == 'r')
@@ -185,7 +185,7 @@ int main(int argc, char **argv) {
 				updateLRU(num, BSize, L1NumSets, L1Assoc, L1_cache);
 
 				// DEBUG - remove this line
-				cout << "L1 HIT " << num << endl;
+				//cout << "L1 HIT " << num << endl;
 
 				continue;
 			}
@@ -195,13 +195,13 @@ int main(int argc, char **argv) {
 			L2AccCnt++;
 			TotalTime += L2Cyc;
 			// DEBUG - remove this line
-			cout << "L1 MISS " << num << endl;
+			//cout << "L1 MISS " << num << endl;
 
 			//search for tag in L2
 			if (IsInCache(num, BSize, L2NumSets, L2Assoc, L2_cache))
 			{
 				// DEBUG - remove this line
-				cout << "L2 HIT" << num << endl;
+				//cout << "L2 HIT" << num << endl;
 
 				//update L2 LRU because we read from block of address "num"
 				updateLRU(num, BSize, L2NumSets, L2Assoc, L2_cache);
@@ -212,7 +212,7 @@ int main(int argc, char **argv) {
 				if (dirty && removedAddress!=1 )
 				{
 					// DEBUG - remove this line
-					cout << "removed from L1 " << removedAddress << endl;
+					//cout << "removed from L1 " << removedAddress << endl;
 
 					UpdateDirty(removedAddress, BSize, L2NumSets, L2Assoc, L2_cache, true);
 					updateLRU(removedAddress, BSize, L2NumSets, L2Assoc, L2_cache);
@@ -227,14 +227,14 @@ int main(int argc, char **argv) {
 			TotalTime += MemCyc;
 
 			// DEBUG - remove this line
-			cout << "L2 MISS " << num << endl;
+			//cout << "L2 MISS " << num << endl;
 
 			//add address to L2
 			bool dirty =false;
 			unsigned long int removedAddress = writeBlockToCache(num, BSize, L2NumSets, L2Assoc, L2_cache,dirty);
 
 			// DEBUG - remove this line
-			if(removedAddress!=1){cout << "removed from L2 " << removedAddress << endl;}
+			//if(removedAddress!=1){cout << "removed from L2 " << removedAddress << endl;}
 
 
 
@@ -246,7 +246,7 @@ int main(int argc, char **argv) {
 				removeBlockFromCache(removedAddress, BSize, L1NumSets, L1Assoc, L1_cache);
 
 				// DEBUG - remove this line
-				cout << "removed from L1 " << removedAddress << endl;
+				//cout << "removed from L1 " << removedAddress << endl;
 
 			}
 
@@ -258,7 +258,7 @@ int main(int argc, char **argv) {
 			// if removed block from L1 and it is dirty: update L2 block as dirty
 
 			// DEBUG - remove this line
-			if(removedAddress!=1){cout << "removed from L1 " << removedAddress << endl;}
+			//if(removedAddress!=1){cout << "removed from L1 " << removedAddress << endl;}
 
 			if (dirty && removedAddress != 1)
 			{
@@ -283,7 +283,7 @@ int main(int argc, char **argv) {
 			if (IsInCache(num, BSize, L1NumSets, L1Assoc, L1_cache))
 			{
 				// DEBUG - remove this line
-				cout << "L1 HIT" << num << endl;
+				//cout << "L1 HIT" << num << endl;
 
 				//update dirty L1
 				UpdateDirty(num, BSize, L1NumSets, L1Assoc, L1_cache, true);
@@ -297,13 +297,13 @@ int main(int argc, char **argv) {
 			TotalTime += L2Cyc;
 
 			// DEBUG - remove this line
-			cout << "L1 MISS" << num << endl;
+			//cout << "L1 MISS" << num << endl;
 
 			//search for tag in L2
 			if (IsInCache(num, BSize, L2NumSets, L2Assoc, L2_cache))
 			{
 				// DEBUG - remove this line
-				cout << "L2 HIT" << num << endl;
+				//cout << "L2 HIT" << num << endl;
 
 				if (WrAlloc) //if WrAlloc==true need to write in L1
 				{
@@ -319,7 +319,7 @@ int main(int argc, char **argv) {
 					if (dirty && removedAddress != 1)
 					{
 						// DEBUG - remove this line
-						cout << "removed from L1" << removedAddress << endl;
+						//cout << "removed from L1" << removedAddress << endl;
 
 						UpdateDirty(removedAddress, BSize, L2NumSets, L2Assoc, L2_cache, true);// if it dirty update L2 dirty
 						updateLRU(removedAddress, BSize, L2NumSets, L2Assoc, L2_cache);
@@ -340,7 +340,7 @@ int main(int argc, char **argv) {
 			L2MissCnt++;
 
 			// DEBUG - remove this line
-			cout << "L2 MISS" << num << endl;
+			//cout << "L2 MISS" << num << endl;
 
 			if (WrAlloc) //if WrAlloc==true need to write in L1 and L2
 			{
@@ -351,7 +351,7 @@ int main(int argc, char **argv) {
 				unsigned long int removedAddress = writeBlockToCache(num, BSize, L2NumSets, L2Assoc, L2_cache,dirty);
 
 				// DEBUG - remove this line
-				if(removedAddress!=1){cout << "removed from L2 " << removedAddress << endl;}
+				//if(removedAddress!=1){cout << "removed from L2 " << removedAddress << endl;}
 
 
 				//if L2 have no space, take someone out
@@ -362,7 +362,7 @@ int main(int argc, char **argv) {
 					removeBlockFromCache(removedAddress, BSize, L1NumSets, L1Assoc, L1_cache);
 
 					// DEBUG - remove this line
-					cout << "removed from L1 " << removedAddress << endl;
+					//cout << "removed from L1 " << removedAddress << endl;
 
 				}
 
@@ -378,7 +378,7 @@ int main(int argc, char **argv) {
 				if (dirty && removedAddress != 1)
 				{
 					// DEBUG - remove this line
-					cout << "removed from L1 " << removedAddress << endl;
+					//cout << "removed from L1 " << removedAddress << endl;
 
 					// if it dirty update L2 dirty
 					UpdateDirty(removedAddress, BSize, L2NumSets, L2Assoc, L2_cache, true);
